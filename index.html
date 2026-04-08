@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام التنبؤ الذكي — v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f5f0;
+  --surface:#ffffff;
+  --surface2:#f0ede6;
+  --surface3:#e8e4da;
+  --ink:#1a1612;
+  --ink2:#6b6459;
+  --ink3:#a89e92;
+  --border:#ddd8ce;
+  --green:#1a6b45;
+  --green-light:#e6f4ed;
+  --green-mid:#2d9b66;
+  --amber:#b85c00;
+  --amber-light:#fef3e2;
+  --amber-mid:#e07a10;
+  --red:#b83232;
+  --red-light:#fdeaea;
+  --blue:#1a3d6b;
+  --blue-light:#e8eef8;
+  --ramadan:#7c3aed;
+  --ramadan-light:#f3f0ff;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Cairo',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+}
+
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
+
+/* ─── TOPNAV ─── */
+.nav{
+  position:sticky;top:0;z-index:50;
+  background:var(--ink);
+  padding:0 1.5rem;
+  height:54px;display:flex;align-items:center;justify-content:space-between;
+}
+.nav-left{display:flex;align-items:center;gap:14px}
+.nav-icon{width:34px;height:34px;background:var(--green-mid);border-radius:8px;display:grid;place-items:center;font-size:17px}
+.nav-name{font-size:14px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.nav-ver{font-size:10px;color:#666;font-family:var(--mono);margin-top:1px}
+.nav-right{display:flex;align-items:center;gap:12px}
+
+/* Season toggle */
+.season-toggle{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:6px 14px;
+  cursor:pointer;transition:all .2s;
+  user-select:none;
+}
+.season-toggle:hover{background:rgba(255,255,255,.12)}
+.season-toggle.ramadan-on{background:rgba(124,58,237,.2);border-color:rgba(124,58,237,.4)}
+.st-label{font-size:12px;color:#ccc;font-family:var(--mono)}
+.st-label.on{color:#c4b5fd}
+.toggle-pill{
+  width:36px;height:20px;border-radius:10px;
+  background:#444;position:relative;transition:background .25s;
+}
+.toggle-pill.on{background:var(--ramadan)}
+.toggle-knob{
+  position:absolute;top:3px;right:3px;
+  width:14px;height:14px;border-radius:50%;background:#fff;
+  transition:transform .25s;
+}
+.toggle-pill.on .toggle-knob{transform:translateX(-16px)}
+
+.nav-user{font-size:12px;color:#888;font-family:var(--mono)}
+
+/* ─── LAYOUT ─── */
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 54px)}
+
+/* ─── SIDEBAR ─── */
+.sidebar{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto}
+.sb-top{padding:1.25rem}
+.sb-title{font-size:10px;font-family:var(--mono);color:var(--ink3);letter-spacing:2px;margin-bottom:10px}
+
+/* Filters */
+.filter-group{display:flex;flex-direction:column;gap:4px;margin-bottom:1.25rem}
+.filter-btn{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;border-radius:7px;
+  font-size:13px;color:var(--ink2);cursor:pointer;
+  border:1px solid transparent;background:transparent;
+  font-family:var(--sans);transition:all .15s;text-align:right;
+}
+.filter-btn:hover{background:var(--surface2);color:var(--ink)}
+.filter-btn.active{background:var(--green-light);color:var(--green);border-color:rgba(45,155,102,.2);font-weight:600}
+.filter-btn .fb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.filter-btn .fb-count{margin-right:auto;font-family:var(--mono);font-size:11px;
+  background:var(--surface2);color:var(--ink3);padding:2px 7px;border-radius:4px}
+.filter-btn.active .fb-count{background:rgba(45,155,102,.15);color:var(--green)}
+
+/* Order log */
+.order-log{padding:0 1.25rem 1.25rem}
+.log-title{font-size:10px;font-family:var(--mono);color:var(--ink3);letter-spacing:2px;margin-bottom:10px}
+.log-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
+.log-item{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:9px 10px;
+  font-size:12px;transition:all .2s;
+}
+.log-item.approved{border-color:rgba(45,155,102,.3);background:var(--green-light)}
+.log-item.rejected{border-color:rgba(184,50,50,.25);background:var(--red-light);opacity:.7}
+.log-prod{font-weight:600;color:var(--ink);margin-bottom:3px;font-size:12px}
+.log-meta{color:var(--ink3);font-family:var(--mono);font-size:10px;display:flex;gap:6px}
+.log-status{font-size:10px;font-family:var(--mono);margin-top:4px}
+.log-item.approved .log-status{color:var(--green)}
+.log-item.rejected .log-status{color:var(--red)}
+.log-empty{font-size:12px;color:var(--ink3);text-align:center;padding:16px 0;font-family:var(--mono)}
+
+/* ─── MAIN ─── */
+.main{overflow-y:auto;padding:1.75rem}
+
+/* Page header */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem}
+.ph-title{font-size:22px;font-weight:900;letter-spacing:-.5px}
+.ph-title .accent{color:var(--green)}
+.ph-title .accent.ramadan{color:var(--ramadan)}
+.ph-sub{font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:3px}
+.ph-actions{display:flex;gap:8px;align-items:center}
+.btn{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:var(--green-mid)}
+.btn-primary:disabled{background:var(--border);color:var(--ink3);cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--ink2)}
+.btn-ghost:hover{border-color:var(--ink3);color:var(--ink)}
+.btn-ramadan{background:var(--ramadan);color:#fff}
+
+/* Ramadan banner */
+.ramadan-banner{
+  background:linear-gradient(135deg,var(--ramadan-light),#ede9fe);
+  border:1px solid rgba(124,58,237,.2);
+  border-radius:12px;padding:14px 18px;
+  margin-bottom:1.5rem;
+  display:flex;align-items:center;justify-content:space-between;
+  animation:slideDown .35s ease;
+}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.rb-left{display:flex;align-items:center;gap:12px}
+.rb-icon{font-size:26px}
+.rb-title{font-size:14px;font-weight:700;color:var(--ramadan)}
+.rb-sub{font-size:12px;color:#7c3aed99;margin-top:2px}
+.rb-stats{display:flex;gap:16px}
+.rb-stat{text-align:center}
+.rb-stat-num{font-family:var(--mono);font-size:1.3rem;font-weight:700;color:var(--ramadan)}
+.rb-stat-label{font-size:10px;color:#9b7ec8}
+
+/* KPI row */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:11px;padding:1.1rem 1.25rem;
+  box-shadow:var(--shadow);transition:all .2s;
+}
+.kpi:hover{box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.kpi-num{font-size:1.8rem;font-weight:900;font-family:var(--mono);line-height:1;transition:all .4s}
+.kpi-label{font-size:11px;color:var(--ink2);margin-top:4px}
+.kpi-delta{font-size:11px;font-family:var(--mono);margin-top:6px;display:flex;align-items:center;gap:4px}
+.up{color:var(--green)}.down{color:var(--red)}.neutral{color:var(--ink3)}
+
+/* Chart area */
+.chart-row{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;margin-bottom:1.5rem}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;box-shadow:var(--shadow)}
+.cc-title{font-size:13px;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
+.cc-tag{font-size:10px;font-family:var(--mono);color:var(--ink3);padding:3px 8px;background:var(--surface2);border-radius:4px}
+
+/* Bar chart */
+.bar-chart{display:flex;align-items:flex-end;gap:5px;height:130px;padding-bottom:0}
+.bc-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%}
+.bc-spacer{flex:1}
+.bc-bar{width:85%;border-radius:4px 4px 0 0;transition:height .5s cubic-bezier(.34,1.56,.64,1),background .3s;min-height:4px}
+.bc-val{font-size:10px;font-family:var(--mono);font-weight:600;transition:color .3s;flex-shrink:0}
+.bc-label{font-size:9px;color:var(--ink3);font-family:var(--mono);flex-shrink:0}
+
+/* Donut-ish breakdown */
+.breakdown{display:flex;flex-direction:column;gap:8px}
+.bk-row{display:flex;align-items:center;gap:8px}
+.bk-label{font-size:12px;color:var(--ink2);flex:1}
+.bk-bar-wrap{flex:2;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bk-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.bk-val{font-size:11px;font-family:var(--mono);font-weight:600;min-width:36px;text-align:left}
+
+/* ─── TABLE ─── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.tw-header{padding:.9rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.tw-title{font-size:13px;font-weight:700}
+.tw-hint{font-size:11px;color:var(--ink3);font-family:var(--mono)}
+.tw-bulk{display:flex;gap:6px}
+
+table{width:100%;border-collapse:collapse}
+th{
+  text-align:right;padding:9px 1rem;
+  font-size:10px;font-family:var(--mono);letter-spacing:1px;
+  color:var(--ink3);background:var(--surface2);
+  border-bottom:1px solid var(--border);font-weight:400;
+}
+td{padding:11px 1rem;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.row-approved td{background:rgba(45,155,102,.03)}
+tr.row-rejected td{background:rgba(184,50,50,.03);opacity:.65}
+tr:hover td{background:#faf9f7}
+tr.row-approved:hover td{background:rgba(45,155,102,.06)}
+
+/* Product cell */
+.pc{display:flex;align-items:center;gap:9px}
+.pc-icon{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:17px;flex-shrink:0}
+.pc-name{font-weight:600;font-size:13px;line-height:1.3}
+.pc-cat{font-size:10px;color:var(--ink3);margin-top:1px}
+
+/* Editable qty cell */
+.qty-cell{display:flex;align-items:center;gap:6px}
+.qty-stepper{
+  display:flex;align-items:center;
+  border:1px solid var(--border);border-radius:7px;overflow:hidden;
+  background:var(--surface2);
+}
+.qs-btn{
+  width:28px;height:28px;border:none;background:transparent;
+  font-size:15px;cursor:pointer;color:var(--ink2);
+  display:grid;place-items:center;transition:all .15s;
+}
+.qs-btn:hover{background:var(--border);color:var(--ink)}
+.qs-val{
+  min-width:40px;text-align:center;font-family:var(--mono);
+  font-size:13px;font-weight:600;padding:0 4px;
+  border:none;background:transparent;outline:none;color:var(--ink);
+}
+.qty-unit{font-size:11px;color:var(--ink3)}
+
+/* Demand bar */
+.demand-wrap{display:flex;align-items:center;gap:7px}
+.d-bar{flex:1;height:5px;background:var(--surface2);border-radius:2px;overflow:hidden;min-width:60px}
+.d-fill{height:100%;border-radius:2px;transition:width .5s ease,background .3s}
+.d-num{font-family:var(--mono);font-size:12px;font-weight:600;min-width:34px}
+
+/* Confidence badge */
+.conf{font-size:10px;font-family:var(--mono);font-weight:600;padding:3px 8px;border-radius:4px}
+.conf-h{background:var(--green-light);color:var(--green)}
+.conf-m{background:var(--amber-light);color:var(--amber)}
+.conf-l{background:var(--red-light);color:var(--red)}
+
+/* Status badge */
+.status-badge{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:5px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.st-pending{background:var(--surface2);color:var(--ink3);border:1px solid var(--border)}
+.st-approved{background:var(--green-light);color:var(--green);border:1px solid rgba(45,155,102,.25)}
+.st-rejected{background:var(--red-light);color:var(--red);border:1px solid rgba(184,50,50,.2)}
+
+/* Action buttons */
+.action-row{display:flex;gap:5px}
+.act{padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+.act-approve{background:var(--green-light);color:var(--green)}
+.act-approve:hover{background:var(--green);color:#fff}
+.act-reject{background:var(--red-light);color:var(--red)}
+.act-reject:hover{background:var(--red);color:#fff}
+.act-undo{background:var(--surface2);color:var(--ink2)}
+.act-undo:hover{background:var(--border)}
+
+/* Summary bar at bottom */
+.summary-bar{
+  position:sticky;bottom:0;z-index:10;
+  background:var(--ink);color:#fff;
+  padding:12px 1.5rem;
+  display:flex;align-items:center;justify-content:space-between;
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sb-items{display:flex;gap:24px}
+.sb-stat{display:flex;align-items:center;gap:8px;font-size:13px}
+.sb-stat .s-num{font-family:var(--mono);font-weight:700;font-size:15px}
+.sb-stat .s-num.green{color:#6ee7b7}.sb-stat .s-num.amber{color:#fcd34d}.sb-stat .s-num.red{color:#fca5a5}
+.sb-right{display:flex;gap:8px}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(12px);
+  background:var(--ink);color:#fff;
+  padding:11px 18px;border-radius:9px;
+  font-size:13px;font-weight:600;
+  opacity:0;transition:all .3s;z-index:200;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:0 4px 20px rgba(0,0,0,.3);
+  white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.success{border-left:3px solid #6ee7b7}
+.toast.warning{border-left:3px solid #fcd34d}
+
+/* Highlight animation */
+@keyframes numFlash{0%{color:inherit}30%{color:var(--green)}100%{color:inherit}}
+.num-flash{animation:numFlash .6s ease}
+@keyframes rowHighlight{0%{background:rgba(45,155,102,.15)}100%{background:transparent}}
+.row-flash{animation:rowHighlight .8s ease}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-left">
+    <div class="nav-icon">🧠</div>
+    <div>
+      <div class="nav-name">نظام التنبؤ الذكي بالمخزون</div>
+      <div class="nav-ver">DEMAND FORECASTING AI — prototype v2</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="season-toggle" id="seasonToggle" onclick="toggleRamadan()">
+      <span class="st-label" id="stLabel">وضع رمضان</span>
+      <div class="toggle-pill" id="togglePill"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="nav-user">أحمد — مدير المشتريات</div>
+  </div>
+</nav>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="sb-title">تصفية المنتجات</div>
+      <div class="filter-group" id="filterBtns">
+        <button class="filter-btn active" onclick="setFilter(this,'all')">
+          <div class="fb-dot" style="background:var(--ink3)"></div>
+          الكل
+          <span class="fb-count" id="fc-all">8</span>
+        </button>
+        <button class="filter-btn" onclick="setFilter(this,'pending')">
+          <div class="fb-dot" style="background:var(--amber)"></div>
+          بانتظار الموافقة
+          <span class="fb-count" id="fc-pending">8</span>
+        </button>
+        <button class="filter-btn" onclick="setFilter(this,'approved')">
+          <div class="fb-dot" style="background:var(--green)"></div>
+          تمت الموافقة
+          <span class="fb-count" id="fc-approved">0</span>
+        </button>
+        <button class="filter-btn" onclick="setFilter(this,'rejected')">
+          <div class="fb-dot" style="background:var(--red)"></div>
+          مرفوضة
+          <span class="fb-count" id="fc-rejected">0</span>
+        </button>
+      </div>
+
+      <div class="sb-title" style="margin-top:1rem">الفئات</div>
+      <div class="filter-group">
+        <button class="filter-btn" onclick="setFilter(this,'dairy')">🥛 ألبان</button>
+        <button class="filter-btn" onclick="setFilter(this,'organic')">🌿 عضوي</button>
+        <button class="filter-btn" onclick="setFilter(this,'juice')">🧃 عصائر</button>
+        <button class="filter-btn" onclick="setFilter(this,'bread')">🍞 مخبوزات</button>
+      </div>
+    </div>
+
+    <div class="order-log">
+      <div class="log-title">سجل القرارات</div>
+      <div class="log-list" id="logList">
+        <div class="log-empty" id="logEmpty">لا يوجد قرارات بعد</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" id="mainArea">
+
+    <!-- Page header -->
+    <div class="ph">
+      <div>
+        <div class="ph-title">توقعات الطلب — <span class="accent" id="weekLabel">الأسبوع القادم</span></div>
+        <div class="ph-sub" id="phSub">الأحد 6 أبريل — السبت 12 أبريل 2025 • تحديث منذ 4 دقائق</div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn btn-ghost" onclick="resetAll()">↺ إعادة ضبط</button>
+        <button class="btn btn-primary" id="approveAllBtn" onclick="approveAll()">✓ موافقة على الكل</button>
+      </div>
+    </div>
+
+    <!-- Ramadan banner -->
+    <div class="ramadan-banner" id="ramadanBanner" style="display:none">
+      <div class="rb-left">
+        <div class="rb-icon">🌙</div>
+        <div>
+          <div class="rb-title">وضع رمضان مُفعَّل</div>
+          <div class="rb-sub">الكميات المتوقعة تعكس ارتفاع الطلب الموسمي</div>
+        </div>
+      </div>
+      <div class="rb-stats">
+        <div class="rb-stat"><div class="rb-stat-num">+34%</div><div class="rb-stat-label">ارتفاع الطلب</div></div>
+        <div class="rb-stat"><div class="rb-stat-num">+52%</div><div class="rb-stat-label">العصائر</div></div>
+        <div class="rb-stat"><div class="rb-stat-num">+41%</div><div class="rb-stat-label">التمور والحلويات</div></div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-num" id="kpi-accuracy" style="color:var(--green)">87%</div>
+        <div class="kpi-label">دقة التنبؤ</div>
+        <div class="kpi-delta up">↑ +4% هذا الشهر</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-num" id="kpi-total" style="color:var(--blue)">0</div>
+        <div class="kpi-label">إجمالي الوحدات المطلوبة</div>
+        <div class="kpi-delta neutral" id="kpi-total-delta">يتحدث لحظياً</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-num" id="kpi-approved" style="color:var(--green)">0</div>
+        <div class="kpi-label">طلبات موافق عليها</div>
+        <div class="kpi-delta" id="kpi-approved-delta">من أصل <span id="totalProducts">8</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-num" id="kpi-saving" style="color:var(--amber)">0</div>
+        <div class="kpi-label">ريال هدر سيُجنَّب</div>
+        <div class="kpi-delta up" id="kpi-saving-delta">يرتفع مع كل موافقة</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="cc-title">
+          الطلب المتوقع — يومياً
+          <span class="cc-tag" id="chartMode">وضع عادي</span>
+        </div>
+        <div class="bar-chart" id="weekChart"></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-title">توزيع الطلب بالفئة</div>
+        <div class="breakdown" id="breakdown"></div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="tw-header">
+        <div class="tw-title">قائمة التنبؤ وطلبات الشراء</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="tw-hint">عدّل الكميات ثم وافق أو ارفض</div>
+          <div class="tw-bulk">
+            <button class="btn btn-ghost" style="font-size:11px;padding:5px 12px" onclick="approvePending()">✓ موافقة على المعلقة</button>
+          </div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>المنتج</th>
+            <th>المخزون الحالي</th>
+            <th>الطلب المتوقع</th>
+            <th>الكمية المقترحة</th>
+            <th>دقة التنبؤ</th>
+            <th>الحالة</th>
+            <th>الإجراء</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Summary bar -->
+<div class="summary-bar" id="summaryBar">
+  <div class="sb-items">
+    <div class="sb-stat">
+      <span>موافق</span>
+      <span class="s-num green" id="sb-approved">0</span>
+    </div>
+    <div class="sb-stat">
+      <span>مرفوض</span>
+      <span class="s-num red" id="sb-rejected">0</span>
+    </div>
+    <div class="sb-stat">
+      <span>معلق</span>
+      <span class="s-num amber" id="sb-pending">8</span>
+    </div>
+    <div class="sb-stat">
+      <span>إجمالي الوحدات المطلوبة</span>
+      <span class="s-num" id="sb-total" style="color:#e2e8f0">—</span>
+    </div>
+  </div>
+  <div class="sb-right">
+    <button class="btn btn-ghost" style="color:#ccc;border-color:#444;font-size:12px" onclick="exportSummary()">تصدير الملخص</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── DATA ── */
+const baseProducts = [
+  {id:1,cat:'dairy',   icon:'🥛',name:'حليب طازج كامل الدسم',    sub:'ألبان — يومي',          stock:45, baseDemand:180, baseQty:140, conf:'h', saving:420},
+  {id:2,cat:'organic', icon:'🌿',name:'زبادي يوناني بالعسل',      sub:'عضوي — طبيعي 100%',    stock:30, baseDemand:95,  baseQty:70,  conf:'h', saving:360},
+  {id:3,cat:'juice',   icon:'🧃',name:'عصير برتقال طازج',         sub:'عصائر — طازج يومي',    stock:20, baseDemand:160, baseQty:145, conf:'m', saving:580},
+  {id:4,cat:'bread',   icon:'🍞',name:'خبز حبوب كاملة',           sub:'مخبوزات — يومي',        stock:60, baseDemand:120, baseQty:65,  conf:'h', saving:195},
+  {id:5,cat:'dairy',   icon:'🧀',name:'جبن شيدر مقطع',            sub:'ألبان — مستورد',        stock:25, baseDemand:80,  baseQty:60,  conf:'m', saving:240},
+  {id:6,cat:'organic', icon:'🥚',name:'بيض بلدي عضوي',            sub:'عضوي — مزرعة محلية',   stock:80, baseDemand:200, baseQty:125, conf:'h', saving:500},
+  {id:7,cat:'juice',   icon:'🍹',name:'عصير رمان طازج',           sub:'موسمي — رمضان',         stock:10, baseDemand:220, baseQty:215, conf:'l', saving:860},
+  {id:8,cat:'bread',   icon:'🥐',name:'كرواسون بالزبدة',          sub:'مخبوزات — يومي',        stock:55, baseDemand:70,  baseQty:20,  conf:'h', saving:150},
+];
+
+const ramadanMultiplier = {dairy:1.25, organic:1.3, juice:1.52, bread:1.2};
+const days = ['أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
+const baseWeekVals = [85,92,78,110,130,145,88];
+
+let isRamadan = false;
+let currentFilter = 'all';
+let products = baseProducts.map(p=>({...p, qty: p.baseQty, status:'pending'}));
+let logEntries = [];
+
+/* ── RENDER TABLE ── */
+function renderTable(){
+  const body = document.getElementById('tableBody');
+  const filtered = getFiltered();
+  if(!filtered.length){
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--ink3);font-family:var(--mono);font-size:13px">لا يوجد منتجات في هذه الفئة</td></tr>`;
+    return;
+  }
+  body.innerHTML = filtered.map(p=>{
+    const demand = isRamadan ? Math.round(p.baseDemand * (ramadanMultiplier[p.cat]||1.2)) : p.baseDemand;
+    const pct = Math.min(100, Math.round(demand/300*100));
+    const barColor = p.conf==='h' ? 'var(--green-mid)' : p.conf==='m' ? 'var(--amber-mid)' : 'var(--red)';
+    const confLabel = {h:'عالية',m:'متوسطة',l:'منخفضة'}[p.conf];
+    const confClass = {h:'conf-h',m:'conf-m',l:'conf-l'}[p.conf];
+    const rowClass = p.status==='approved'?'row-approved':p.status==='rejected'?'row-rejected':'';
+    const isPending = p.status==='pending';
+
+    return `<tr class="${rowClass}" id="row_${p.id}">
+      <td>
+        <div class="pc">
+          <div class="pc-icon" style="background:${barColor}1a">${p.icon}</div>
+          <div><div class="pc-name">${p.name}</div><div class="pc-cat">${p.sub}</div></div>
+        </div>
+      </td>
+      <td><span style="font-family:var(--mono);font-weight:600">${p.stock}</span> <span style="color:var(--ink3);font-size:11px">وحدة</span></td>
+      <td>
+        <div class="demand-wrap">
+          <div class="d-bar"><div class="d-fill" style="width:${pct}%;background:${barColor}"></div></div>
+          <div class="d-num" style="color:${barColor}">${demand}</div>
+        </div>
+      </td>
+      <td>
+        <div class="qty-cell">
+          ${isPending ? `
+          <div class="qty-stepper">
+            <button class="qs-btn" onclick="changeQty(${p.id},-5)">−</button>
+            <input class="qs-val" id="qty_${p.id}" type="number" value="${p.qty}" min="1" onchange="setQty(${p.id},this.value)" style="width:48px">
+            <button class="qs-btn" onclick="changeQty(${p.id},5)">+</button>
+          </div>
+          ` : `<span style="font-family:var(--mono);font-weight:700;font-size:14px">${p.qty}</span>`}
+          <span class="qty-unit">وحدة</span>
+        </div>
+      </td>
+      <td><span class="conf ${confClass}">${confLabel}</span></td>
+      <td>
+        ${p.status==='pending'   ? `<span class="status-badge st-pending">● معلق</span>` : ''}
+        ${p.status==='approved'  ? `<span class="status-badge st-approved">✓ موافق</span>` : ''}
+        ${p.status==='rejected'  ? `<span class="status-badge st-rejected">✗ مرفوض</span>` : ''}
+      </td>
+      <td>
+        ${isPending ? `
+          <div class="action-row">
+            <button class="act act-approve" onclick="decide(${p.id},'approved')">✓ موافقة</button>
+            <button class="act act-reject"  onclick="decide(${p.id},'rejected')">✗ رفض</button>
+          </div>
+        ` : `
+          <button class="act act-undo" onclick="undoDecide(${p.id})">↺ تراجع</button>
+        `}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── FILTER ── */
+function getFiltered(){
+  if(currentFilter==='all') return products;
+  if(['pending','approved','rejected'].includes(currentFilter))
+    return products.filter(p=>p.status===currentFilter);
+  return products.filter(p=>p.cat===currentFilter);
+}
+
+function setFilter(el, f){
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+/* ── QTY EDIT ── */
+function changeQty(id, delta){
+  const p = products.find(x=>x.id===id);
+  if(!p || p.status!=='pending') return;
+  p.qty = Math.max(1, p.qty + delta);
+  const input = document.getElementById('qty_'+id);
+  if(input){ input.value = p.qty; flashNum(input); }
+  updateKPIs();
+}
+
+function setQty(id, val){
+  const p = products.find(x=>x.id===id);
+  if(!p || p.status!=='pending') return;
+  p.qty = Math.max(1, parseInt(val)||1);
+  updateKPIs();
+}
+
+function flashNum(el){
+  el.classList.remove('num-flash');
+  void el.offsetWidth;
+  el.classList.add('num-flash');
+  setTimeout(()=>el.classList.remove('num-flash'),600);
+}
+
+/* ── DECIDE ── */
+function decide(id, status){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  p.status = status;
+  addLog(p, status);
+  renderTable();
+  updateKPIs();
+  updateCounters();
+  const msg = status==='approved'
+    ? `✓ تمت الموافقة على ${p.name} — ${p.qty} وحدة`
+    : `✗ تم رفض طلب ${p.name}`;
+  toast(msg, status==='approved'?'success':'warning');
+  flashRow('row_'+id);
+}
+
+function undoDecide(id){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  p.status = 'pending';
+  logEntries = logEntries.filter(l=>l.id!==id);
+  renderLog();
+  renderTable();
+  updateKPIs();
+  updateCounters();
+  toast('↺ تم التراجع عن القرار');
+}
+
+function approveAll(){
+  const pending = products.filter(p=>p.status==='pending');
+  pending.forEach(p=>{ p.status='approved'; addLog(p,'approved'); });
+  renderTable();
+  updateKPIs();
+  updateCounters();
+  renderLog();
+  toast(`✓ تمت الموافقة على ${pending.length} طلبات دفعة واحدة`,'success');
+}
+
+function approvePending(){
+  approveAll();
+}
+
+function resetAll(){
+  products = baseProducts.map(p=>({...p, qty: p.baseQty, status:'pending'}));
+  logEntries = [];
+  currentFilter = 'all';
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.filter-btn').classList.add('active');
+  renderTable(); updateKPIs(); updateCounters(); renderLog();
+  toast('↺ تم إعادة الضبط');
+}
+
+function flashRow(id){
+  const row = document.getElementById(id);
+  if(!row) return;
+  row.classList.add('row-flash');
+  setTimeout(()=>row.classList.remove('row-flash'),800);
+}
+
+/* ── RAMADAN ── */
+function toggleRamadan(){
+  isRamadan = !isRamadan;
+  document.getElementById('togglePill').classList.toggle('on', isRamadan);
+  document.getElementById('stLabel').classList.toggle('on', isRamadan);
+  document.getElementById('stLabel').textContent = isRamadan ? '🌙 رمضان' : 'وضع رمضان';
+  document.getElementById('seasonToggle').classList.toggle('ramadan-on', isRamadan);
+  document.getElementById('ramadanBanner').style.display = isRamadan ? 'flex' : 'none';
+  document.getElementById('weekLabel').textContent = isRamadan ? 'موسم رمضان 🌙' : 'الأسبوع القادم';
+  document.getElementById('weekLabel').className = isRamadan ? 'accent ramadan' : 'accent';
+  document.getElementById('chartMode').textContent = isRamadan ? '🌙 وضع رمضان' : 'وضع عادي';
+  // Update pending qty suggestions
+  products.forEach(p=>{
+    if(p.status==='pending'){
+      const mult = ramadanMultiplier[p.cat]||1.2;
+      p.qty = isRamadan ? Math.round(p.baseQty * mult) : p.baseQty;
+    }
+  });
+  renderTable();
+  updateKPIs();
+  buildCharts();
+  toast(isRamadan ? '🌙 تم تفعيل وضع رمضان — الكميات تعكس الموسم' : 'تم إيقاف وضع رمضان');
+}
+
+/* ── CHARTS ── */
+function buildCharts(){
+  const mult = isRamadan ? 1.34 : 1;
+  const vals = baseWeekVals.map(v=>Math.round(v*mult));
+  const max = Math.max(...vals);
+  const el = document.getElementById('weekChart');
+  const CHART_H = 90;
+  el.innerHTML = days.map((d,i)=>{
+    const isHigh = vals[i] > 110;
+    const bg = isRamadan ? (isHigh?'#7c3aed':'#a78bfa') : (isHigh?'var(--amber-mid)':'var(--green-mid)');
+    const barH = Math.max(6, Math.round(vals[i]/max * CHART_H));
+    return `<div class="bc-col">
+      <div class="bc-val" style="color:${bg}">${vals[i]}</div>
+      <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+        <div style="width:82%;margin:0 auto;height:${barH}px;border-radius:4px 4px 0 0;background:${bg}44;border:1.5px solid ${bg};transition:height .5s cubic-bezier(.34,1.56,.64,1)"></div>
+      </div>
+      <div class="bc-label">${d}</div>
+    </div>`;
+  }).join('');
+
+  // Breakdown
+  const cats = [
+    {label:'🥛 ألبان',   cat:'dairy',  color:'var(--blue)'},
+    {label:'🌿 عضوي',   cat:'organic', color:'var(--green)'},
+    {label:'🧃 عصائر',  cat:'juice',   color:'var(--amber)'},
+    {label:'🍞 مخبوزات',cat:'bread',   color:'var(--ink3)'},
+  ];
+  const totalDemand = products.reduce((s,p)=>{
+    const mult2 = isRamadan?(ramadanMultiplier[p.cat]||1.2):1;
+    return s+Math.round(p.baseDemand*mult2);
+  },0);
+  document.getElementById('breakdown').innerHTML = cats.map(c=>{
+    const sum = products.filter(p=>p.cat===c.cat).reduce((s,p)=>{
+      const mult2 = isRamadan?(ramadanMultiplier[p.cat]||1.2):1;
+      return s+Math.round(p.baseDemand*mult2);
+    },0);
+    const pct = Math.round(sum/totalDemand*100);
+    return `<div class="bk-row">
+      <div class="bk-label">${c.label}</div>
+      <div class="bk-bar-wrap"><div class="bk-fill" style="width:${pct}%;background:${c.color}"></div></div>
+      <div class="bk-val" style="color:${c.color}">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── KPIS & COUNTERS ── */
+function updateKPIs(){
+  const total = products.filter(p=>p.status!=='rejected').reduce((s,p)=>s+p.qty,0);
+  const approved = products.filter(p=>p.status==='approved').length;
+  const saving = products.filter(p=>p.status==='approved').reduce((s,p)=>s+p.saving,0);
+  animNum('kpi-total', total);
+  animNum('kpi-approved', approved);
+  animNum('kpi-saving', saving);
+  document.getElementById('sb-total').textContent = total.toLocaleString();
+  document.getElementById('sb-approved').textContent = approved;
+  document.getElementById('sb-rejected').textContent = products.filter(p=>p.status==='rejected').length;
+  document.getElementById('sb-pending').textContent = products.filter(p=>p.status==='pending').length;
+  if(isRamadan) document.getElementById('kpi-accuracy').textContent = '91%';
+  else document.getElementById('kpi-accuracy').textContent = '87%';
+}
+
+function updateCounters(){
+  document.getElementById('fc-all').textContent = products.length;
+  document.getElementById('fc-pending').textContent = products.filter(p=>p.status==='pending').length;
+  document.getElementById('fc-approved').textContent = products.filter(p=>p.status==='approved').length;
+  document.getElementById('fc-rejected').textContent = products.filter(p=>p.status==='rejected').length;
+}
+
+let numTargets = {};
+function animNum(id, target){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const current = parseInt(el.textContent.replace(/,/g,''))||0;
+  if(current===target){ el.textContent=target.toLocaleString(); return; }
+  const diff = target - current;
+  const steps = 12;
+  let step = 0;
+  clearInterval(numTargets[id]);
+  numTargets[id] = setInterval(()=>{
+    step++;
+    el.textContent = Math.round(current + diff*(step/steps)).toLocaleString();
+    if(step>=steps){ clearInterval(numTargets[id]); el.textContent=target.toLocaleString(); }
+  },25);
+}
+
+/* ── LOG ── */
+function addLog(p, status){
+  logEntries.unshift({id:p.id,name:p.name,qty:p.qty,status,icon:p.icon,time:new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'})});
+  renderLog();
+}
+
+function renderLog(){
+  const list = document.getElementById('logList');
+  const empty = document.getElementById('logEmpty');
+  if(!logEntries.length){
+    empty.style.display='block';
+    list.innerHTML = '';
+    list.appendChild(empty);
+    return;
+  }
+  list.innerHTML = logEntries.slice(0,10).map(l=>`
+    <div class="log-item ${l.status}">
+      <div class="log-prod">${l.icon} ${l.name}</div>
+      <div class="log-meta"><span>${l.qty} وحدة</span><span>${l.time}</span></div>
+      <div class="log-status">${l.status==='approved'?'✓ موافق':'✗ مرفوض'}</div>
+    </div>`).join('');
+}
+
+/* ── TOAST ── */
+function toast(msg, type=''){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show '+(type||'');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+function exportSummary(){
+  const approved = products.filter(p=>p.status==='approved');
+  const text = `ملخص طلبات الشراء\n${new Date().toLocaleDateString('ar')}\n\n`
+    + approved.map(p=>`• ${p.name}: ${p.qty} وحدة`).join('\n')
+    + `\n\nإجمالي الوحدات: ${approved.reduce((s,p)=>s+p.qty,0)}`
+    + `\nالهدر المُجنَّب: ${approved.reduce((s,p)=>s+p.saving,0)} ريال`;
+  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'purchase-orders.txt';
+  a.click();
+  toast('✓ تم تصدير الملخص');
+}
+
+/* ── INIT ── */
+renderTable();
+updateKPIs();
+updateCounters();
+buildCharts();
+</script>
+</body>
+</html>
